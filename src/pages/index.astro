@@ -1,0 +1,546 @@
+---
+// src/pages/index.astro
+import trendingData from '../data/trending.json';
+
+// Get today's story (first item)
+const story = trendingData.length > 0 ? trendingData[0] : null;
+const previousStories = trendingData.slice(1, 6);
+
+// Parse content preserving all formatting
+function parseContent(content) {
+    if (!content) return [];
+    
+    const lines = content.split('\n');
+    const blocks = [];
+    let currentBlock = null;
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        
+        // Skip empty lines
+        if (trimmed === '') {
+            if (currentBlock) {
+                blocks.push(currentBlock);
+                currentBlock = null;
+            }
+            continue;
+        }
+        
+        // Check for bold subheading (like **What Happened**)
+        if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+            if (currentBlock) {
+                blocks.push(currentBlock);
+                currentBlock = null;
+            }
+            blocks.push({
+                type: 'subheading',
+                content: trimmed.slice(2, -2)
+            });
+            continue;
+        }
+        
+        // Check for bullet points (starting with - or •)
+        if (trimmed.startsWith('-') || trimmed.startsWith('•') || trimmed.startsWith('*')) {
+            if (!currentBlock || currentBlock.type !== 'list') {
+                if (currentBlock) blocks.push(currentBlock);
+                currentBlock = {
+                    type: 'list',
+                    items: []
+                };
+            }
+            // Remove the bullet marker and trim
+            let itemText = trimmed;
+            if (itemText.startsWith('-')) itemText = itemText.slice(1);
+            else if (itemText.startsWith('•')) itemText = itemText.slice(1);
+            else if (itemText.startsWith('*')) itemText = itemText.slice(1);
+            currentBlock.items.push(itemText.trim());
+            continue;
+        }
+        
+        // Check for numbered list (starting with number like "1.")
+        if (trimmed.match(/^\d+\./)) {
+            if (!currentBlock || currentBlock.type !== 'numbered-list') {
+                if (currentBlock) blocks.push(currentBlock);
+                currentBlock = {
+                    type: 'numbered-list',
+                    items: []
+                };
+            }
+            // Remove the number marker
+            let itemText = trimmed.replace(/^\d+\.\s*/, '');
+            currentBlock.items.push(itemText.trim());
+            continue;
+        }
+        
+        // Regular paragraph
+        if (!currentBlock || currentBlock.type !== 'paragraph') {
+            if (currentBlock) blocks.push(currentBlock);
+            currentBlock = {
+                type: 'paragraph',
+                content: trimmed
+            };
+        } else {
+            // Append to existing paragraph
+            currentBlock.content += ' ' + trimmed;
+        }
+    }
+    
+    if (currentBlock) {
+        blocks.push(currentBlock);
+    }
+    
+    return blocks;
+}
+
+const contentBlocks = story ? parseContent(story.content) : [];
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Daily AI tech news and insights">
+    <title>{story ? story.title : 'AI Tech Daily'} | AI Tech Daily</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #ffffff;
+            color: #1a1a2e;
+            line-height: 1.6;
+        }
+        
+        /* Top Navigation */
+        .top-nav {
+            background: #0a0a0a;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            border-bottom: 1px solid #1f2937;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .logo {
+            font-size: 1.4rem;
+            font-weight: 800;
+            text-decoration: none;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+        
+        .nav-links a {
+            color: #9ca3af;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        
+        .nav-links a:hover {
+            color: white;
+        }
+        
+        /* Main Layout */
+        .main-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 3rem;
+        }
+        
+        /* Article Styles */
+        .category-badge {
+            display: inline-block;
+            background: #eef2ff;
+            color: #4f46e5;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 1rem;
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+            color: #0f172a;
+        }
+        
+        .meta {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 0.85rem;
+        }
+        
+        /* Content Blocks */
+        .content-paragraph {
+            margin-bottom: 1.5rem;
+            font-size: 1.05rem;
+            line-height: 1.7;
+            color: #334155;
+        }
+        
+        .content-subheading {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 2rem 0 1rem 0;
+            color: #0f172a;
+            border-left: 4px solid #4f46e5;
+            padding-left: 1rem;
+        }
+        
+        .content-list {
+            margin: 1rem 0 1.5rem 2rem;
+            list-style-type: disc;
+        }
+        
+        .content-list li {
+            margin-bottom: 0.75rem;
+            line-height: 1.6;
+            color: #334155;
+        }
+        
+        .content-numbered-list {
+            margin: 1rem 0 1.5rem 2rem;
+            list-style-type: decimal;
+        }
+        
+        .content-numbered-list li {
+            margin-bottom: 0.75rem;
+            line-height: 1.6;
+            color: #334155;
+        }
+        
+        /* Key Takeaways special styling */
+        .key-takeaways {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border: 1px solid #e2e8f0;
+        }
+        
+        /* Ad Boxes */
+        .ad-box {
+            background: #fafafa;
+            border: 1px solid #e5e7eb;
+            border-radius: 20px;
+            padding: 1.5rem;
+            text-align: center;
+            margin: 2rem 0;
+            transition: box-shadow 0.2s;
+        }
+        
+        .ad-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #9ca3af;
+            margin-bottom: 0.75rem;
+        }
+        
+        .ad-placeholder {
+            background: #f3f4f6;
+            padding: 2rem;
+            border-radius: 12px;
+            color: #6b7280;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        /* Sidebar */
+        .sidebar-widget {
+            background: #f9fafb;
+            border-radius: 16px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .sidebar-widget h3 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #4f46e5;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .sidebar-ad {
+            background: #fafafa;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            padding: 1rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .sidebar-ad-placeholder {
+            background: #f3f4f6;
+            padding: 2rem;
+            border-radius: 8px;
+            color: #6b7280;
+            font-size: 0.75rem;
+        }
+        
+        .story-list-item {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .story-list-item a {
+            text-decoration: none;
+            color: #1f2937;
+            font-weight: 500;
+            font-size: 0.9rem;
+            display: block;
+        }
+        
+        .story-list-item a:hover {
+            color: #4f46e5;
+        }
+        
+        .story-list-item .item-date {
+            font-size: 0.7rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+        
+        .source-link {
+            margin: 2rem 0;
+            text-align: center;
+        }
+        
+        .source-link a {
+            display: inline-block;
+            background: #4f46e5;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 40px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        .source-link a:hover {
+            background: #4338ca;
+        }
+        
+        .footer {
+            background: #f9fafb;
+            margin-top: 4rem;
+            padding: 2rem;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .newsletter {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 1.25rem;
+            border-radius: 16px;
+            text-align: center;
+        }
+        
+        .newsletter h4 {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 4rem;
+            background: #f9fafb;
+            border-radius: 24px;
+        }
+        
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+                padding: 1rem;
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+            .top-nav {
+                padding: 0.8rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="/" class="logo">🤖 AI TECH DAILY</a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="#">Archive</a>
+            <a href="#">About</a>
+        </div>
+    </nav>
+    
+    <div class="main-container">
+        <main class="article-content">
+            {!story ? (
+                <div class="empty-state">
+                    <h2>📡 No story yet</h2>
+                    <p>Check back tomorrow for the latest AI tech news.</p>
+                </div>
+            ) : (
+                <>
+                    <span class="category-badge">🔥 EXCLUSIVE ANALYSIS</span>
+                    <h1>{story.title}</h1>
+                    <div class="meta">
+                        <span>📅 {story.date}</span>
+                        {story.source && <span>📰 Source: {story.source}</span>}
+                    </div>
+                    
+                    {/* AD BOX 1 - TOP OF ARTICLE */}
+                    <div class="ad-box">
+                        <div class="ad-label">Advertisement</div>
+                        <div class="ad-placeholder">📢 Your Ad Here<br /><small>Leaderboard (728x90)</small></div>
+                    </div>
+                    
+                    {/* RENDER CONTENT WITH PROPER FORMATTING */}
+                    {(() => {
+                        const elements = [];
+                        let blockCount = 0;
+                        let adPositions = [3, 6, 9, 12]; // Insert ads after these block counts
+                        let adIndex = 2;
+                        
+                        for (let i = 0; i < contentBlocks.length; i++) {
+                            const block = contentBlocks[i];
+                            
+                            if (block.type === 'subheading') {
+                                elements.push(<h2 class="content-subheading">{block.content}</h2>);
+                                blockCount++;
+                            }
+                            else if (block.type === 'paragraph') {
+                                elements.push(<p class="content-paragraph">{block.content}</p>);
+                                blockCount++;
+                            }
+                            else if (block.type === 'list') {
+                                elements.push(
+                                    <ul class="content-list">
+                                        {block.items.map((item, idx) => <li key={idx}>{item}</li>)}
+                                    </ul>
+                                );
+                                blockCount++;
+                            }
+                            else if (block.type === 'numbered-list') {
+                                elements.push(
+                                    <ol class="content-numbered-list">
+                                        {block.items.map((item, idx) => <li key={idx}>{item}</li>)}
+                                    </ol>
+                                );
+                                blockCount++;
+                            }
+                            
+                            // Insert ad after certain blocks
+                            if (adPositions.includes(blockCount) && i < contentBlocks.length - 1) {
+                                elements.push(
+                                    <div key={`ad-${adIndex}`} class="ad-box">
+                                        <div class="ad-label">Advertisement</div>
+                                        <div class="ad-placeholder">📢 Your Ad Here<br /><small>Responsive Display Ad</small></div>
+                                    </div>
+                                );
+                                adIndex++;
+                            }
+                        }
+                        
+                        return elements;
+                    })()}
+                    
+                    {/* AD BOX - BOTTOM OF ARTICLE */}
+                    <div class="ad-box">
+                        <div class="ad-label">Advertisement</div>
+                        <div class="ad-placeholder">📢 Your Ad Here<br /><small>Bottom Banner (728x90)</small></div>
+                    </div>
+                    
+                    {story.url && (
+                        <div class="source-link">
+                            <a href={story.url} target="_blank" rel="noopener noreferrer">
+                                🔗 Read Original Source →
+                            </a>
+                        </div>
+                    )}
+                </>
+            )}
+        </main>
+        
+        <aside class="sidebar">
+            <div class="sidebar-ad">
+                <div class="ad-label">Advertisement</div>
+                <div class="sidebar-ad-placeholder">📢 Your Ad<br /><small>300x250</small></div>
+            </div>
+            
+            <div class="sidebar-widget">
+                <h3>📰 PREVIOUS STORIES</h3>
+                {previousStories.length > 0 ? previousStories.map((post, idx) => (
+                    <div class="story-list-item" key={idx}>
+                        <a href="#">{post.title.length > 60 ? post.title.substring(0, 60) + '...' : post.title}</a>
+                        <div class="item-date">{post.date}</div>
+                    </div>
+                )) : (
+                    <p style="color: #9ca3af;">No previous stories yet.</p>
+                )}
+            </div>
+            
+            <div class="sidebar-ad">
+                <div class="ad-label">Advertisement</div>
+                <div class="sidebar-ad-placeholder">📢 Your Ad<br /><small>300x600</small></div>
+            </div>
+            
+            <div class="newsletter">
+                <h4>📧 Daily Newsletter</h4>
+                <p>Get AI news delivered to your inbox</p>
+                <div style="margin-top: 0.75rem; font-size: 0.7rem;">Coming soon</div>
+            </div>
+            
+            <div class="sidebar-ad">
+                <div class="ad-label">Advertisement</div>
+                <div class="sidebar-ad-placeholder">📢 Your Ad<br /><small>300x250</small></div>
+            </div>
+        </aside>
+    </div>
+    
+    <footer class="footer">
+        <p>🤖 AI Tech Daily • Daily AI and tech news • Updated daily</p>
+        <p style="margin-top: 0.5rem;">© 2026 AI Tech Daily. All rights reserved.</p>
+    </footer>
+</body>
+</html>
